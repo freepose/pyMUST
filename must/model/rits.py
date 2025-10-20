@@ -4,7 +4,7 @@
 import torch
 import torch.nn as nn
 
-from ..metric import MSE
+from ..metric import MAE
 
 
 class TemporalDecay(nn.Module):
@@ -48,13 +48,16 @@ class TemporalDecay(nn.Module):
 
 
 class RITS(nn.Module):
-    def __init__(self, input_size: int, rnn_hidden_size: int = 32, n_classes: int = 2, dropout_rate: float = 0.25):
+    def __init__(self, input_size: int, rnn_hidden_size: int = 32,
+                 n_classes: int = 2, dropout_rate: float = 0.25,
+                 recovery_weight: float = 0.1):
         super(RITS, self).__init__()
 
         # Ensure input_size == output_size, the number of features of time series, they are values, mask, deltas
         self.input_size = input_size
         self.rnn_hidden_size = rnn_hidden_size
         self.n_classes = n_classes
+        self.recovery_weight = recovery_weight
 
         self.rnn_cell = nn.LSTMCell(input_size * 2, self.rnn_hidden_size)  # Why input_size * 2?
 
@@ -70,7 +73,7 @@ class RITS(nn.Module):
         self.out = nn.Linear(self.rnn_hidden_size, self.n_classes)
 
         self.input_aware_loss = 0.  # recovery loss
-        self.input_aware_loss_fn = MSE()  # mask mse on (x, x_h), (x, z_h), (x, c_h)
+        self.input_aware_loss_fn = MAE()
 
     def forward(self, values: torch.Tensor, masks: torch.Tensor, deltas: torch.Tensor):
         """
@@ -98,15 +101,15 @@ class RITS(nn.Module):
 
             h = h * gamma_h
 
-            x_h = self.hist_reg(h)  # mask MSE on (x, x_h) at time t
+            x_h = self.hist_reg(h)  # mask MAE on (x, x_h) at time t
             x_h_list.append(x_h.unsqueeze(1))
 
             x_c = m * x + (1 - m) * x_h
-            z_h = self.feat_reg(x_c)  # mask MSE on (x, z_h) at time t
+            z_h = self.feat_reg(x_c)  # mask MAE on (x, z_h) at time t
             z_h_list.append(z_h.unsqueeze(1))
 
             alpha = self.weight_combine(torch.cat([gamma_x, m], dim=1))
-            c_h = alpha * z_h + (1 - alpha) * x_h  # mask MSE on (x, c_h) at time t
+            c_h = alpha * z_h + (1 - alpha) * x_h  # mask MAE on (x, c_h) at time t
             c_h_list.append(c_h.unsqueeze(1))
 
             c_c = m * x + (1 - m) * c_h
@@ -123,6 +126,7 @@ class RITS(nn.Module):
         self.input_aware_loss = self.input_aware_loss_fn(values, x_hs, masks) + \
                                 self.input_aware_loss_fn(values, z_hs, masks) + \
                                 self.input_aware_loss_fn(values, c_hs, masks)
+        self.input_aware_loss *= self.recovery_weight
 
         y_h = self.out(h)
 
@@ -131,12 +135,14 @@ class RITS(nn.Module):
 
 class RITSI(nn.Module):
 
-    def __init__(self, input_size: int, rnn_hidden_size: int = 32, n_classes: int = 2):
+    def __init__(self, input_size: int, rnn_hidden_size: int = 32, n_classes: int = 2,
+                 recovery_weight: float = 0.1):
         super(RITSI, self).__init__()
 
         self.input_size = input_size  # Ensure input_size == output_size
         self.rnn_hidden_size = rnn_hidden_size
         self.n_classes = n_classes
+        self.recovery_weight = recovery_weight
 
         self.rnn_cell = nn.LSTMCell(self.input_size * 2, self.rnn_hidden_size)
 
@@ -146,7 +152,7 @@ class RITSI(nn.Module):
         self.out = nn.Linear(self.rnn_hidden_size, n_classes)
 
         self.input_aware_loss = 0.
-        self.input_aware_loss_fn = MSE()
+        self.input_aware_loss_fn = MAE()
 
     def forward(self, values: torch.Tensor, masks: torch.Tensor, deltas: torch.Tensor):
         batch_size, seq_len, input_size = values.size()
@@ -167,7 +173,7 @@ class RITSI(nn.Module):
             h = h * gamma
             x_h = self.regression(h)
 
-            x_c = m * x + (1 - m) * x_h  # mask MSE on (x, x_c) at time t
+            x_c = m * x + (1 - m) * x_h  # mask MAE on (x, x_c) at time t
             x_c_list.append(x_c.unsqueeze(dim=1))
 
             inputs = torch.cat([x_c, m], dim=1)
@@ -177,7 +183,7 @@ class RITSI(nn.Module):
         imputations = torch.cat(imputations, dim=1)
 
         x_cs = torch.cat(x_c_list, dim=1)
-        self.input_aware_loss = self.input_aware_loss_fn(values, x_cs, masks)
+        self.input_aware_loss = self.input_aware_loss_fn(values, x_cs, masks) * self.recovery_weight
 
         y_h = self.out(h)
 

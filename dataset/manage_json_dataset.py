@@ -87,6 +87,8 @@ json_metadata = {
             'inputs': [{'forward': {'values': 'float32', 'masks': 'bool', 'deltas': 'float32'},
                         'backward': {'values': 'float32', 'masks': 'bool', 'deltas': 'float32'}}],
             'outputs': [{'label': 'int'},
+                        {'label': 'int'},
+                        {'label': 'int'},
                         {'forward': {'evals': 'float32', 'eval_masks': 'bool'}},
                         # {'backward': {'evals': 'float32', 'eval_masks': 'bool'}}
                         ],
@@ -130,7 +132,7 @@ def prepare_multitask_dataset(data_root: str, dataset_name: str,
     records = []
     for filename in json_filenames:
         with open(filename, 'r') as f:
-            lines = f.readlines()[:500]
+            lines = f.readlines()  # [:500]
 
         name = Path(filename).name
         with tqdm(total=len(lines), file=sys.stdout, leave=False, disable=not show_progress) as pbar:

@@ -132,8 +132,8 @@ class MultitaskTrainer:
 
     def fit(self, train_dataset: MultitaskDataset,
             val_dataset: Optional[MultitaskDataset] = None,
-            epoch_range: Tuple[int, int] = (1, 20),
             batch_size: int = 32, shuffle: bool = True,
+            epoch_range: Tuple[int, int] = (1, 20),
             show_progress: bool = True):
 
         train_dataloader = data.DataLoader(train_dataset, batch_size, shuffle)

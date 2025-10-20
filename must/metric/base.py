@@ -50,11 +50,11 @@ class MultitaskCriteria(AbstractMetric):
             "The number of criteria must match the number of weights."
 
         self.abbr_names = []
-        for criterion in self.criteria:
+        for i, criterion in enumerate(self.criteria, start=1):
             name = type(criterion).__name__
             if not name.isupper():
                 name = ''.join(ch for ch in name if ch.isupper())
-            self.abbr_names.append(name)
+            self.abbr_names.append(f'{i}_{name}({round(self.weights[i-1], 10)})')
 
     def __call__(self, tasks: List[Tuple[torch.Tensor, TensorSequence]]) -> torch.Tensor:
         """
@@ -93,7 +93,7 @@ class MultitaskCriteria(AbstractMetric):
         """
         results = {'loss': 0.}
         for criterion, weight, abbr in zip(self.criteria, self.weights, self.abbr_names):
-            results[abbr] = weight * criterion.compute()
-        results['loss'] = sum(results.values())
+            results[abbr] = criterion.compute()
+            results['loss'] += weight * results[abbr]
 
         return results

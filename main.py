@@ -8,7 +8,7 @@ import torch
 from must import initial_seed, initial_logger, get_device
 from must.train import MultitaskTrainer
 from must.metric import MultitaskEvaluator, EmptyEvaluator, MultitaskCriteria, RegressEvaluator, ClassifyEvaluator
-from must.metric import CrossEntropy, MSE
+from must.metric import CrossEntropy, MSE, MAE, MRE
 
 from must.model.rits import RITS, RITSI
 from must.model.m_rnn import MRNN
@@ -29,55 +29,53 @@ def main():
 
     """
     data_root = os.path.expanduser('~/data/time_series') if os.name == 'posix' else 'D:/data/time_series'
-    ds_device, model_device = 'cpu', 'cpu'
+    ds_device, model_device = 'cpu', 'mps'
 
     # classify+forward+forwards
     # train_ds, val_ds, test_ds = prepare_multitask_dataset(data_root, 'PhysioNetJson', 'classify+forward+backward', (0.6, 0.2, 0.2), ds_device, show_progress=True)
     # train_ds, val_ds, test_ds = prepare_multitask_dataset(data_root, 'PhysioNetJson', 'classify+forward+forwards', (0.6, 0.2, 0.2), ds_device, show_progress=True)
-    train_ds, val_ds, test_ds = prepare_multitask_dataset(data_root, 'PhysioNetJson',
-                                                          'classify+forward+backward', (0.6, 0.2, 0.2),
-                                                          ds_device, show_progress=True)
+    train_ds, val_ds, test_ds = prepare_multitask_dataset(data_root, 'PhysioNetJson', 'classify+forward+backward',
+                                                          (0.6, 0.2, 0.2), ds_device, show_progress=True)
 
     print('\n'.join([str(ds) for ds in [train_ds, val_ds, test_ds]]))
 
     # inputs: forward only, with values, masks, deltas
-    # model = RITS(input_size=35, rnn_hidden_size=64, n_classes=2)
-    # model = RITSI(input_size=35, rnn_hidden_size=64, n_classes=2)
+    # model = RITS(input_size=35, rnn_hidden_size=64, n_classes=2, recovery_weight=0.1)
+    # model = RITSI(input_size=35, rnn_hidden_size=64, n_classes=2, recovery_weight=0.1)
 
     # inputs: forward + backward, each with values, masks, deltas
-    # model = MRNN(input_size=35, rnn_hidden_size=64, n_classes=2)
+    # model = MRNN(input_size=35, rnn_hidden_size=64, n_classes=2, recovery_weight=0.1)
 
     # inputs: forward only, with values, masks, deltas, forwards
-    # model = GRUD(input_size=35, rnn_hidden_size=64, n_classes=2)
+    # model = GRUD(input_size=35, rnn_hidden_size=64, n_classes=2, dropout_rate=0.5)
 
     # inputs: forward + backward, each with values, masks, deltas
-    # model = BRITSI(input_size=35, rnn_hidden_size=64, n_classes=2)
-    model = BRITS(input_size=35, rnn_hidden_size=64, n_classes=2)
+    model = BRITSI(input_size=35, rnn_hidden_size=64, n_classes=2, recovery_weight=0.3, consistency_weight=0.1)
+    # model = BRITS(input_size=35, rnn_hidden_size=108, n_classes=2, dropout_rate=0.25, recovery_weight=0.3)
 
     print(model)
 
     model_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(model_params, lr=0.001)
-    criteria = MultitaskCriteria([CrossEntropy(), MSE()], weights=[1.0, 1.0])
-    evaluator = MultitaskEvaluator({'c_f': EmptyEvaluator(),
-                                    'r': RegressEvaluator(['MAE', 'MRE'])})
-    # criteria = MultitaskCriteria([CrossEntropy()])
-    # evaluator = MultitaskEvaluator({'c': ClassifyEvaluator(['Precision', 'Recall'])})
+    criteria = MultitaskCriteria([CrossEntropy(), CrossEntropy(), CrossEntropy(), MSE()], weights=[1.0, 1.0, 0., 0.])
+    evaluator = MultitaskEvaluator({'f': EmptyEvaluator(),
+                                    'b': EmptyEvaluator(),
+                                    't': ClassifyEvaluator(['AUC']),
+                                    'im': RegressEvaluator(['MAE', 'MRE'])})
 
     trainer = MultitaskTrainer(get_device(model_device), model,
                                is_initial_weights=True, is_compile=False,
                                optimizer=optimizer,
                                criteria=criteria, evaluator=evaluator)
 
-    trainer.fit(train_ds, val_ds,
-                epoch_range=(1, 1000), batch_size=32, shuffle=True,
-                show_progress=True)
+    trainer.fit(train_ds, val_ds, 32,
+                epoch_range=(1, 1000), shuffle=True, show_progress=True)
 
     if test_ds is not None:
-        test_metrics = trainer.evaluate(test_ds, batch_size=32, show_progress=True)
+        test_metrics = trainer.evaluate(test_ds, 32, show_progress=True)
         print(f'Test metrics: {test_metrics}')
     elif val_ds is not None:
-        val_metrics = trainer.evaluate(val_ds, batch_size=32, show_progress=True)
+        val_metrics = trainer.evaluate(val_ds, 32, show_progress=True)
         print(f'Validation metrics: {val_metrics}')
 
 

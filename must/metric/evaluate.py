@@ -11,7 +11,7 @@ from setuptools.namespaces import flatten
 from ..data_type import TensorSequence
 
 from .regress import MSE, MAE, MRE, RMSE, MAPE, CVRMSE, SMAPE, PCC, RAE, RSE, R2
-from .classify import CrossEntropy, Accuracy, Precision, Recall
+from .classify import CrossEntropy, Accuracy, Precision, Recall, AUC
 
 
 class AbstractEvaluator(ABC):
@@ -170,6 +170,7 @@ class ClassifyEvaluator(AbstractEvaluator):
             'Accuracy': Accuracy,
             'Precision': Precision,
             'Recall': Recall,
+            'AUC': AUC,
             # 'F1Score': F1Score,
         }
 
