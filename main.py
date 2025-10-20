@@ -8,7 +8,7 @@ import torch
 from must import initial_seed, initial_logger, get_device
 from must.train import MultitaskTrainer
 from must.metric import MultitaskEvaluator, EmptyEvaluator, MultitaskCriteria, RegressEvaluator, ClassifyEvaluator
-from must.metric import CrossEntropy, MSE, MAE, MRE
+from must.metric import CrossEntropy, MSE, MAE, MRE, ORAE
 
 from must.model.base.utils import get_model_info
 from must.model.rits import RITS, RITSI
@@ -17,6 +17,64 @@ from must.model.gru_d import GRUD
 from must.model.brits import BRITSI, BRITS
 
 from dataset.manage_json_dataset import prepare_multitask_dataset
+
+
+def function_based_methods():
+    data_root = os.path.expanduser('~/data/time_series') if os.name == 'posix' else 'D:/data/time_series'
+    ds_device, model_device = 'cpu', 'mps'
+
+    train_ds, val_ds, test_ds = prepare_multitask_dataset(data_root, 'PhysioNetJson', 'function-based', (0.6, 0.2, 0.2), ds_device)
+
+    # Global-mean method
+    train_values, train_masks = train_ds.inputs
+    train_mean = (train_values[train_masks]).mean()
+
+    val_evals, val_eval_masks = val_ds.outputs[0]
+    test_evals, test_eval_masks = test_ds.outputs[0]
+
+    val_hat = torch.ones_like(val_evals) * train_mean
+    val_mae = MAE()(val_hat, val_evals, val_eval_masks)
+    val_orae = ORAE()(val_hat, val_evals, val_eval_masks)
+
+    test_hat = torch.ones_like(test_evals) * train_mean
+    test_mae = MAE()(test_hat, test_evals, test_eval_masks)
+    test_orae = ORAE()(test_hat, test_evals, test_eval_masks)
+
+    print('global means', {'val_mae': val_mae.item(), 'val_orae': val_orae.item()})
+    print('global means', {'test_mae': test_mae.item(), 'test_orae': test_orae.item()})
+
+    # Variable-mean method
+    sum_vals = (train_values * train_masks).sum(dim=[0, 1])
+    count_vals = train_masks.sum(dim=[0, 1])
+    feature_means = sum_vals / count_vals.clamp(min=1)
+
+    val_hat = feature_means.expand_as(val_evals)
+    val_mae = MAE()(val_hat, val_evals, val_eval_masks)
+    val_orae = ORAE()(val_hat, val_evals, val_eval_masks)
+
+    test_hat = feature_means.expand_as(test_evals)
+    test_mae = MAE()(test_hat, test_evals, test_eval_masks)
+    test_orae = ORAE()(test_hat, test_evals, test_eval_masks)
+
+    print('feature means',{'val_mae': val_mae.item(), 'val_orae': val_orae.item()})
+    print('feature means',{'test_mae': test_mae.item(), 'test_orae': test_orae.item()})
+
+    # time-mean method
+    sum_vals = (train_values * train_masks).sum(dim=[0, 2])
+    count_vals = train_masks.sum(dim=[0, 2])
+    time_means = sum_vals / count_vals.clamp(min=1)
+
+    val_hat = time_means.expand_as(val_evals.permute(0, 2, 1)).permute(0, 2, 1)
+    val_mae = MAE()(val_hat, val_evals, val_eval_masks)
+    val_orae = ORAE()(val_hat, val_evals, val_eval_masks)
+
+    test_hat = time_means.expand_as(test_evals.permute(0, 2, 1)).permute(0, 2, 1)
+    test_mae = MAE()(test_hat, test_evals, test_eval_masks)
+    test_orae = ORAE()(test_hat, test_evals, test_eval_masks)
+
+    print('time means', {'val_mae': val_mae.item(), 'val_orae': val_orae.item()})
+    print('time means', {'test_mae': test_mae.item(), 'test_orae': test_orae.item()})
+
 
 
 def main():
@@ -85,3 +143,4 @@ if __name__ == '__main__':
     initial_logger()
 
     main()
+    # function_based_methods()

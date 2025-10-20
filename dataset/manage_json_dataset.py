@@ -58,6 +58,12 @@ json_metadata = {
             # '{root}/disease/PhysioNet_Challenge_2012/03_json/set-c.json'
         ],
 
+        'function-based': {
+            'description': 'Configuration for "MultiTaskDataset" loading (forward only)',
+            'inputs': [{'forward': {'values': 'float32', 'masks': 'bool'}}],
+            'outputs': [{'forward': {'evals': 'float32', 'eval_masks': 'bool'}}],
+        },
+
         'classify': {
             'description': 'Configuration for "MultiTaskDataset" loading (forward only)',
             'inputs': [{'forward': {'values': 'float32', 'masks': 'bool', 'deltas': 'float32'}}],
@@ -132,7 +138,7 @@ def prepare_multitask_dataset(data_root: str, dataset_name: str,
     records = []
     for filename in json_filenames:
         with open(filename, 'r') as f:
-            lines = f.readlines()  # [:500]
+            lines = f.readlines() # [:500]
 
         name = Path(filename).name
         with tqdm(total=len(lines), file=sys.stdout, leave=False, disable=not show_progress) as pbar:
