@@ -10,6 +10,7 @@ from must.train import MultitaskTrainer
 from must.metric import MultitaskEvaluator, EmptyEvaluator, MultitaskCriteria, RegressEvaluator, ClassifyEvaluator
 from must.metric import CrossEntropy, MSE, MAE, MRE
 
+from must.model.base.utils import get_model_info
 from must.model.rits import RITS, RITSI
 from must.model.m_rnn import MRNN
 from must.model.gru_d import GRUD
@@ -50,17 +51,17 @@ def main():
     # model = GRUD(input_size=35, rnn_hidden_size=64, n_classes=2, dropout_rate=0.5)
 
     # inputs: forward + backward, each with values, masks, deltas
-    model = BRITSI(input_size=35, rnn_hidden_size=64, n_classes=2, recovery_weight=0.3, consistency_weight=0.1)
+    model = BRITSI(input_size=35, rnn_hidden_size=64, n_classes=2, recovery_weight=0.5, consistency_weight=0.1)
     # model = BRITS(input_size=35, rnn_hidden_size=108, n_classes=2, dropout_rate=0.25, recovery_weight=0.3)
 
-    print(model)
+    print(get_model_info(model))
 
     model_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(model_params, lr=0.001)
     criteria = MultitaskCriteria([CrossEntropy(), CrossEntropy(), CrossEntropy(), MSE()], weights=[1.0, 1.0, 0., 0.])
     evaluator = MultitaskEvaluator({'f': EmptyEvaluator(),
                                     'b': EmptyEvaluator(),
-                                    't': ClassifyEvaluator(['AUC']),
+                                    't': ClassifyEvaluator(['AUC', 'Accuracy']),
                                     'im': RegressEvaluator(['MAE', 'ORAE'])})
 
     trainer = MultitaskTrainer(get_device(model_device), model,
@@ -69,13 +70,13 @@ def main():
                                criteria=criteria, evaluator=evaluator)
 
     trainer.fit(train_ds, val_ds, 32,
-                epoch_range=(1, 1000), shuffle=True, show_progress=True)
+                epoch_range=(1, 1000), shuffle=True)
 
     if test_ds is not None:
-        test_metrics = trainer.evaluate(test_ds, 32, show_progress=True)
+        test_metrics = trainer.evaluate(test_ds, 32)
         print(f'Test metrics: {test_metrics}')
     elif val_ds is not None:
-        val_metrics = trainer.evaluate(val_ds, 32, show_progress=True)
+        val_metrics = trainer.evaluate(val_ds, 32)
         print(f'Validation metrics: {val_metrics}')
 
 

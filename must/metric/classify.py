@@ -69,8 +69,8 @@ class Accuracy(AbstractMetric):
         self.reset()
 
     def reset(self):
-        self.correct = torch.tensor(0.0)
-        self.total = torch.tensor(0.0)
+        self.correct = 0.
+        self.total = 0.
 
     @torch.no_grad()
     def update(self, logits: torch.Tensor, targets: torch.Tensor):
