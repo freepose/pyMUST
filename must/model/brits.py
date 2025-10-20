@@ -38,7 +38,6 @@ class BRITSI(nn.Module):
         impute = (impute_f + impute_b) / 2
 
         self.input_aware_loss = self.ritsi_f.input_aware_loss + self.ritsi_b.input_aware_loss
-        self.input_aware_loss *= self.recovery_weight
         self.input_aware_loss += torch.abs(impute_f - impute_b).mean() * self.consistency_weight
 
         return y_hat_f, y_hat_b, y_hat, impute
