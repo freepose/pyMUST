@@ -455,6 +455,45 @@ class CVRMSE(AbstractMetric):
         return cvrmse
 
 
+class ORAE(AbstractMetric):
+    """
+        Overall Relative Absolute Error
+        ORAE = sum(|y - y_hat|) / sum(|y|)
+    """
+
+    def __init__(self):
+        self.sum_absolute_errors: float = 0.0
+        self.sum_absolute_real: float = 0.0
+
+    def __call__(self, prediction: torch.Tensor, real: torch.Tensor, mask: torch.Tensor = None) -> torch.Tensor:
+        if mask is not None:
+            prediction = prediction[mask]
+            real = real[mask]
+
+        eps = 1e-8
+        numerator = torch.abs(prediction - real).sum()
+        denominator = torch.abs(real).sum() + eps
+
+        return numerator / denominator
+
+    def reset(self):
+        self.sum_absolute_errors = 0.0
+        self.sum_absolute_real = 0.0
+
+    def update(self, prediction: torch.Tensor, real: torch.Tensor, mask: torch.Tensor = None):
+        if mask is not None:
+            prediction = prediction[mask]
+            real = real[mask]
+
+        self.sum_absolute_errors += torch.abs(prediction - real).sum().detach().item()
+        self.sum_absolute_real += torch.abs(real).sum().detach().item()
+
+    def compute(self) -> float:
+        if self.sum_absolute_real == 0:
+            return 0.0
+        return self.sum_absolute_errors / self.sum_absolute_real
+
+
 class RAE(AbstractMetric):
     """
         Relative Absolute Error (RAE). Computes the sum of absolute errors

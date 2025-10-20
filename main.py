@@ -61,7 +61,7 @@ def main():
     evaluator = MultitaskEvaluator({'f': EmptyEvaluator(),
                                     'b': EmptyEvaluator(),
                                     't': ClassifyEvaluator(['AUC']),
-                                    'im': RegressEvaluator(['MAE', 'MRE'])})
+                                    'im': RegressEvaluator(['MAE', 'ORAE'])})
 
     trainer = MultitaskTrainer(get_device(model_device), model,
                                is_initial_weights=True, is_compile=False,
@@ -80,7 +80,7 @@ def main():
 
 
 if __name__ == '__main__':
-    initial_seed(2025)
+    initial_seed(42)
     initial_logger()
 
     main()

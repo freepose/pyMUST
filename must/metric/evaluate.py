@@ -10,7 +10,7 @@ from setuptools.namespaces import flatten
 
 from ..data_type import TensorSequence
 
-from .regress import MSE, MAE, MRE, RMSE, MAPE, CVRMSE, SMAPE, PCC, RAE, RSE, R2
+from .regress import MSE, MAE, MRE, RMSE, MAPE, CVRMSE, SMAPE, PCC, ORAE, RAE, RSE, R2
 from .classify import CrossEntropy, Accuracy, Precision, Recall, AUC
 
 
@@ -89,6 +89,7 @@ class RegressEvaluator(AbstractEvaluator):
             'sMAPE': SMAPE,
             'CV-RMSE': CVRMSE,
             'PCC': PCC,
+            'ORAE': ORAE,
             'RAE': RAE,
             'RSE': RSE,
             'R2': R2,
